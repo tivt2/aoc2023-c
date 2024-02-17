@@ -5,6 +5,24 @@
 #define INPUT "day1/input"
 #define TEST_INPUT "day1/test_input"
 
+#define LUT_LENGTH 10
+char *lut[] = {"*",    "one", "two",   "three", "four",
+               "five", "six", "seven", "eight", "nine"};
+#define LUT_STR_MAX_LENGTH 5
+
+int lut_digit_get(char *line, size_t pos) {
+  char temp[LUT_STR_MAX_LENGTH];
+  strncpy(temp, line + pos, LUT_STR_MAX_LENGTH);
+
+  for (int i = 1; i < LUT_LENGTH; i++) {
+    int lut_digit_length = strlen(lut[i]);
+    if (strncmp(temp, lut[i], lut_digit_length) == 0) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 int main(void) {
   FILE *file = fopen(INPUT, "r");
   if (file == NULL) {
@@ -35,6 +53,16 @@ int main(void) {
         }
 
         last = digit;
+      } else {
+        int digit = lut_digit_get(line, i);
+        if (digit != -1) {
+          i += strlen(lut[digit]) - 2;
+          if (last == -1) {
+            sum += 10 * digit;
+          }
+
+          last = digit;
+        }
       }
     }
   }
