@@ -5,9 +5,7 @@
 #define INPUT "day2/input"
 #define TEST_INPUT "day2/test_input"
 
-#define MAX_RED 12
-#define MAX_GREEN 13
-#define MAX_BLUE 14
+#define max(x, y) (x < y ? y : x)
 
 typedef struct {
   int id;
@@ -26,23 +24,23 @@ void game_round_points_parse(Game *game, char *round_str) {
 
     int value = atoi(color_value);
     if (strcmp(color, "red") == 0) {
-      if (value > MAX_RED) {
-        game->id = 0;
-        return;
+      if (game->red == 0) {
+        game->red = value;
+      } else {
+        game->red = max(value, game->red);
       }
-      game->red += value;
     } else if (strcmp(color, "green") == 0) {
-      if (value > MAX_GREEN) {
-        game->id = 0;
-        return;
+      if (game->green == 0) {
+        game->green = value;
+      } else {
+        game->green = max(value, game->green);
       }
-      game->green += value;
     } else if (strcmp(color, "blue") == 0) {
-      if (value > MAX_BLUE) {
-        game->id = 0;
-        return;
+      if (game->blue == 0) {
+        game->blue = value;
+      } else {
+        game->blue = max(value, game->blue);
       }
-      game->blue += value;
     }
 
     points_str = strtok_r(NULL, ",", &saveptr1);
@@ -54,9 +52,6 @@ void game_rounds_parse(Game *game, char *rounds_str) {
 
   while (round != NULL) {
     game_round_points_parse(game, round);
-    if (game->id == 0) {
-      return;
-    }
     round = strtok(NULL, ";\n");
   }
 }
@@ -77,9 +72,6 @@ Game game_parse(char *game_str) {
   indentifier = strtok_r(NULL, "", &saveptr1);
   while (indentifier != NULL) {
     game_rounds_parse(&game, indentifier);
-    if (game.id == 0) {
-      break;
-    }
     indentifier = strtok_r(NULL, "", &saveptr1);
   }
   return game;
@@ -92,15 +84,13 @@ int main(void) {
     return 1;
   }
 
-  int id_sum = 0;
+  int sum = 0;
 
   char line[1024];
   while ((fgets(line, sizeof(line), file)) != NULL) {
     Game game = game_parse(line);
 
-    if (game.id != 0) {
-      id_sum += game.id;
-    }
+    sum += (game.red * game.green * game.blue);
     // printf("id: %d, red: %d, green: %d, blue: %d\n", game.id, game.red,
     //        game.green, game.blue);
     // printf("game id: %d\n", game.id);
@@ -109,7 +99,7 @@ int main(void) {
     // printf("game blue: %d\n", game.blue);
   }
 
-  printf("answer: %d\n", id_sum);
+  printf("answer: %d\n", sum);
 
   return 0;
 }
