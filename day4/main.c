@@ -6,7 +6,7 @@
 #define TEST_INPUT "day4/test_input"
 
 typedef struct {
-  int *arr;
+  int (*arr)[2];
   size_t pos;
   size_t len;
 } Bucket;
@@ -40,7 +40,7 @@ Set *set_create(void) {
     }
     b->pos = 0;
     b->len = 128;
-    b->arr = (int *)malloc(sizeof(int) * b->len);
+    b->arr = (int(*)[2])malloc(sizeof(int[2]) * b->len);
     if (b->arr == NULL) {
       perror("malloc b->arr");
       return NULL;
@@ -62,24 +62,26 @@ void set_destroy(Set *set) {
 
 size_t set_hash(Set *set, int val) { return val % set->len; }
 
-int set_add(Set *set, int val) {
-  size_t idx = set_hash(set, val);
+int set_add(Set *set, int key, int val) {
+  size_t idx = set_hash(set, key);
   Bucket *b = set->buckets[idx];
   if (b->pos < (b->len - 1)) {
-    b->arr[b->pos++] = val;
+    b->arr[b->pos][0] = key;
+    b->arr[b->pos][1] = val;
+    b->pos++;
     return 0;
   }
   return -1;
 }
 
-int set_has(Set *set, int val) {
-  size_t idx = set_hash(set, val);
+int set_has(Set *set, int key) {
+  size_t idx = set_hash(set, key);
   Bucket *b = set->buckets[idx];
   if (b->pos == 0) {
     return 0;
   } else {
     for (int i = 0; i < (b->pos); i++) {
-      if (b->arr[i] == val) {
+      if (b->arr[i][0] == key) {
         return 1;
       }
     }
@@ -91,7 +93,7 @@ void set_print(Set *set) {
   for (int i = 0; i < (set->len); i++) {
     Bucket *b = set->buckets[i];
     for (int j = 0; j < (b->pos); j++) {
-      printf("%d\n", b->arr[j]);
+      printf("key: %d, val: %d\n", b->arr[j][0], b->arr[j][1]);
     }
   }
 }
@@ -104,6 +106,7 @@ int main(void) {
   }
 
   int sum = 0;
+  int cards[1024] = {0};
 
   char line[1024];
   while (fgets(line, sizeof(line), file) != NULL) {
@@ -111,32 +114,36 @@ int main(void) {
     char *saveptr1, *saveptr2, *saveptr3;
 
     char *id = strtok_r(line, ":", &saveptr1);
+
+    char id_str[strlen(id) - strlen("Card ") + 1];
+    strcpy(id_str, id + strlen("Card "));
+
     id = strtok_r(NULL, "", &saveptr1);
     char *nums = strtok_r(id, "|", &saveptr2);
     char *win_nums = strtok_r(NULL, "", &saveptr2);
 
     char *num = strtok_r(nums, " ", &saveptr3);
     while (num != NULL) {
-      set_add(set, atoi(num));
+      set_add(set, atoi(num), 0);
 
       num = strtok_r(NULL, " ", &saveptr3);
     }
 
-    int points = 0;
+    int i = atoi(id_str);
+
+    // paying the initialization to {1} in `int cards[1024] = {0}`
+    cards[i]++;
+
+    int multiplier = cards[i];
+    sum += multiplier;
+
     char *win_num = strtok_r(win_nums, " ", &saveptr3);
     while (win_num != NULL) {
       if (set_has(set, atoi(win_num))) {
-        if (points == 0) {
-          points = 1;
-        } else {
-          points *= 2;
-        }
+        cards[++i] += multiplier;
       }
       win_num = strtok_r(NULL, " ", &saveptr3);
     }
-
-    // set_print(set);
-    sum += points;
   }
 
   printf("answer: %d\n", sum);
