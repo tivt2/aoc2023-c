@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,14 +8,11 @@
 
 #define BUFFER_SIZE 1024
 
-int race_process(int race[2]) {
-  printf("time: %d, dist: %d\n", race[0], race[1]);
-  int sum = 0;
-  int accel = 1;
-  for (int i = 0; i < race[0]; i++) {
-    int travel_time = race[0] - i;
-    int speed = i * accel;
-    if (speed * travel_time > race[1]) {
+uint64_t race_process(uint64_t race[2]) {
+  uint64_t sum = 0;
+  for (uint64_t i = 0; i < race[0]; i++) {
+    uint64_t travel_time = race[0] - i;
+    if (i * travel_time > race[1]) {
       sum++;
     }
   }
@@ -28,7 +26,7 @@ int main(void) {
     return 1;
   }
 
-  int races[1024][2];
+  uint64_t race[2];
   size_t races_len = 0;
 
   char line[BUFFER_SIZE];
@@ -45,11 +43,15 @@ int main(void) {
   }
   time_line = strtok_r(NULL, " ", &saveptr1);
 
+  char time[1024];
+  time[0] = '\0';
   while (time_line != NULL) {
-    races[races_len++][0] = atoi(time_line);
+    strcpy(time + strlen(time), time_line);
 
     time_line = strtok_r(NULL, " ", &saveptr1);
   }
+
+  race[0] = strtoul(time, NULL, 10);
 
   if (fgets(line, BUFFER_SIZE, file) == NULL) {
     perror("distance line read");
@@ -63,21 +65,19 @@ int main(void) {
   }
   distance_line = strtok_r(NULL, " ", &saveptr2);
 
-  size_t k = races_len;
+  char distance[1024];
+  distance[0] = '\0';
   while (distance_line != NULL) {
-    races[races_len - k][1] = atoi(distance_line);
-    k--;
+    strcpy(distance + strlen(distance), distance_line);
 
     distance_line = strtok_r(NULL, " ", &saveptr2);
   }
 
-  int record_beat = 1;
+  race[1] = strtoul(distance, NULL, 10);
 
-  for (int i = 0; i < races_len; i++) {
-    record_beat *= race_process(races[i]);
-  }
+  uint64_t record_beat = race_process(race);
 
-  printf("answer: %d\n", record_beat);
+  printf("answer: %lu\n", record_beat);
 
   return 0;
 }
