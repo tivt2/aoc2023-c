@@ -10,20 +10,22 @@
 
 #define max(x, y) (x > y ? x : y)
 
-enum HandType {
-  FIVE_OF_A_KIND,
-  FOUR_OF_A_KIND,
-  FULL_HOUSE,
-  THREE_OF_A_KIND,
-  TWO_PAIR,
+typedef enum HandType {
+  HIGH_CARD,
   ONE_PAIR,
-  HIGH_CARD
-};
+  TWO_PAIR,
+  THREE_OF_A_KIND,
+  FULL_HOUSE,
+  FOUR_OF_A_KIND,
+  FIVE_OF_A_KIND
+} HandType;
 
-const char *typeString[] = {
-    "Five of a kind", "Four of a kind", "Full House", "Three of a kind",
-    "Two pair",       "One pair",       "High card",
-};
+const char *typeString[] = {"High card",       "One pair",   "Two pair",
+                            "Three of a kind", "Full House", "Four of a kind",
+                            "Five of a kind"};
+
+const char card_lut[] = {'J', '2', '3', '4', '5', '6', '7',
+                         '8', '9', 'T', 'Q', 'K', 'A'};
 
 typedef struct {
   enum HandType type;
@@ -31,8 +33,33 @@ typedef struct {
   char cards[5];
 } Hand;
 
-const char card_lut[] = {'2', '3', '4', '5', '6', '7', '8',
-                         '9', 'T', 'J', 'Q', 'K', 'A'};
+HandType hand_type(int idx) {
+  switch (idx) {
+  case 0:
+    return HIGH_CARD;
+    break;
+  case 1:
+    return ONE_PAIR;
+    break;
+  case 2:
+    return TWO_PAIR;
+    break;
+  case 3:
+    return THREE_OF_A_KIND;
+    break;
+  case 4:
+    return FULL_HOUSE;
+    break;
+  case 5:
+    return FOUR_OF_A_KIND;
+    break;
+  case 6:
+    return FIVE_OF_A_KIND;
+    break;
+  default:
+    return HIGH_CARD;
+  }
+}
 
 int card_value(char card) {
   for (int i = 0; i < sizeof(card_lut); i++) {
@@ -48,9 +75,9 @@ int card_cmp(char card1, char card2) {
   int val1 = card_value(card1);
   int val2 = card_value(card2);
   if (val1 > val2) {
-    return 1;
-  } else if (val1 < val2) {
     return -1;
+  } else if (val1 < val2) {
+    return 1;
   } else {
     return 0;
   }
@@ -58,10 +85,10 @@ int card_cmp(char card1, char card2) {
 
 // 0 if equal or -1 if hand1 > hand2 or 1 if hand1 < hand
 int rank_cmp(Hand hand1, Hand hand2) {
-  if (hand1.type < hand2.type) {
-    return 1;
-  } else if (hand1.type > hand2.type) {
+  if (hand1.type > hand2.type) {
     return -1;
+  } else if (hand1.type < hand2.type) {
+    return 1;
   } else {
     int cmp = 0;
     for (int i = 0; i < 5; i++) {
@@ -81,16 +108,21 @@ int rank_cmp(Hand hand1, Hand hand2) {
 
 enum HandType hand_type_get(char cards[5]) {
   char count[5][2] = {{0, 0}};
+  int j_count = 0;
   int max = 0;
   for (int i = 0; i < 5; i++) {
     char card = cards[i];
-    for (int j = 0; j <= i + 1; j++) {
-      char cmp = count[j][0];
-      if (cmp == card || cmp == 0) {
-        count[j][0] = card;
-        count[j][1]++;
-        max = max(max, count[j][1]);
-        break;
+    if (card == 'J') {
+      j_count++;
+    } else {
+      for (int j = 0; j <= i + 1; j++) {
+        char cmp = count[j][0];
+        if (cmp == card || cmp == 0) {
+          count[j][0] = card;
+          count[j][1]++;
+          max = max(max, count[j][1]);
+          break;
+        }
       }
     }
   }
@@ -101,29 +133,46 @@ enum HandType hand_type_get(char cards[5]) {
     return FIVE_OF_A_KIND;
     break;
   case 4:
-    return FOUR_OF_A_KIND;
+    return hand_type(FOUR_OF_A_KIND + j_count);
     break;
   case 3:
-    if (count[0][1] == 2 || count[1][1] == 2) {
-      return FULL_HOUSE;
-    } else {
-      return THREE_OF_A_KIND;
+    if (count[0][1] == 2 || count[1][1] == 2 || j_count == 2) {
+      return hand_type(FULL_HOUSE + j_count);
     }
+    return hand_type(THREE_OF_A_KIND + j_count * 2);
     break;
   case 2:
+    if (j_count > 1) {
+      return hand_type(THREE_OF_A_KIND + j_count);
+    }
     for (int i = 0; i < 4; i++) {
       if (count[i][1] == 2) {
         d++;
       }
     }
     if (d == 1) {
-      return TWO_PAIR;
-    } else {
-      return ONE_PAIR;
+      return hand_type(TWO_PAIR + j_count * 2);
     }
+    return hand_type(ONE_PAIR + j_count * 2);
     break;
   default:
-    return HIGH_CARD;
+    switch (j_count) {
+    case 5:
+    case 4:
+      return FIVE_OF_A_KIND;
+      break;
+    case 3:
+      return FOUR_OF_A_KIND;
+      break;
+    case 2:
+      return THREE_OF_A_KIND;
+      break;
+    case 1:
+      return ONE_PAIR;
+      break;
+    default:
+      return HIGH_CARD;
+    }
     break;
   }
 }
@@ -132,7 +181,7 @@ void hand_merge(Hand *hands, size_t m, size_t len) {
   size_t i = 0, j = m;
 
   while (i < j && j < len) {
-    if (rank_cmp(hands[i], hands[j]) == 1) {
+    if (rank_cmp(hands[i], hands[j]) == -1) {
       Hand tmp = hands[j];
       for (size_t k = j; k > i; k--) {
         hands[k] = hands[k - 1];
@@ -184,6 +233,8 @@ int main(void) {
 
   for (int i = 0; i < hands_len; i++) {
     Hand hand = hands_arr[i];
+    // printf("hand: %s, bid: %d, type: %s, rank: %d\n", hand.cards, hand.bid,
+    //        typeString[hand.type], i + 1);
     result += hand.bid * (i + 1);
   }
 
