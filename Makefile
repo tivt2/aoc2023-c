@@ -1,11 +1,11 @@
 TARGETS := $(wildcard day*)
 
 %.o: %.c
-	gcc -g -o $@ $<
+	gcc -g -o $@ $< util/*.c -I./util
 
 $(TARGETS):
 	@echo "Compiling and running $@..."
-	gcc -g $@/main.c -o $@/main.o
+	gcc -g $@/main.c -o $@/main.o util/*.c -I./util
 	./$@/main.o
 
 clean:
