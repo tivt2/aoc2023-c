@@ -18,8 +18,8 @@ int64_t number_produce_rec(int64_t *nums, size_t len) {
     incs[i - 1] = nums[i] - nums[i - 1];
   }
 
-  int64_t next_inc = number_produce_rec(incs, len - 1);
-  return nums[len - 1] + next_inc;
+  int64_t prev_inc = number_produce_rec(incs, len - 1);
+  return nums[0] - prev_inc;
 }
 
 int main(void) {
