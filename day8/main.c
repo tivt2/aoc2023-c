@@ -1,4 +1,5 @@
 #include "../util/hashmap.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,7 +7,45 @@
 #define INPUT "day8/input"
 #define TEST_INPUT "day8/test_input"
 
+#define max(x, y) (x > y ? x : y)
+#define min(x, y) (x < y ? x : y)
+
 #define BUFFER_SIZE 1024
+
+uint64_t path_start(char *inst, char *start, HashMap *hs) {
+  uint64_t steps = 0;
+
+  char *str = inst;
+  uint64_t i = 0;
+
+  char *pos = start;
+  while (1) {
+    char instruction = *(str + i);
+
+    if (instruction != 'L' && instruction != 'R') {
+      steps += i;
+      str = inst;
+      i = 0;
+      instruction = *(str + i);
+    }
+
+    char **vals = hashmap_get(hs, pos);
+    if (instruction == 'L') {
+      pos = vals[0];
+    } else if (instruction == 'R') {
+      pos = vals[1];
+    }
+
+    if (pos[2] == 'Z') {
+      steps += i + 1;
+      break;
+    }
+
+    i++;
+  }
+
+  return steps;
+}
 
 int main(void) {
   FILE *file = fopen(INPUT, "r");
@@ -27,7 +66,9 @@ int main(void) {
     return 1;
   }
 
-  HashMap *hs = hashmap_create(32);
+  HashMap *hs = hashmap_create(64);
+  char **starts = (char **)malloc(BUFFER_SIZE * BUFFER_SIZE);
+  size_t starts_len = 0;
 
   while (fgets(line, BUFFER_SIZE, file)) {
     char id[4];
@@ -37,6 +78,10 @@ int main(void) {
     if (sscanf(line, "%3s = (%3s, %3s)", id, left, right) != 3) {
       perror("sscanf");
       return 1;
+    }
+
+    if (id[2] == 'A') {
+      starts[starts_len++] = strdup(id);
     }
 
     char *val[2];
@@ -53,37 +98,23 @@ int main(void) {
     hashmap_add(hs, id, val);
   }
 
-  size_t steps = 0;
+  char **pos = starts;
+  uint64_t steps_lcm = path_start(inst, pos[0], hs);
 
-  char *str = inst;
-  size_t i = 0;
+  for (uint64_t i = 1; i < starts_len; i++) {
+    uint64_t steps = path_start(inst, pos[i], hs);
 
-  char *curr = "AAA";
-  while (1) {
-    char instruction = *(str + i);
-
-    if (instruction != 'L' && instruction != 'R') {
-      steps += i;
-      i = 0;
-      str = inst;
-      continue;
+    uint64_t gcd = 1;
+    for (uint64_t j = gcd; j <= steps && j <= steps_lcm; j++) {
+      if (steps % j == 0 && steps_lcm % j == 0) {
+        gcd = j;
+      }
     }
 
-    char **vals = hashmap_get(hs, curr);
-    if (instruction == 'L') {
-      curr = vals[0];
-    } else if (instruction == 'R') {
-      curr = vals[1];
-    }
-    if (strcmp(curr, "ZZZ") == 0) {
-      steps += i + 1;
-      break;
-    }
-
-    i++;
+    steps_lcm = (steps_lcm * steps) / gcd;
   }
 
-  printf("answer: %zu\n", steps);
+  printf("answer: %lu\n", steps_lcm);
 
   hashmap_destroy(hs);
   free(line);
