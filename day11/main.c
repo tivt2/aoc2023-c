@@ -6,89 +6,14 @@
 #define INPUT "day11/input"
 #define TEST_INPUT "day11/test_input"
 
-#define BUFFER_SIZE 512
+#define MAP_SIZE 256 * 256
 #define GROWTH 1000000
 
-#define move_cost(c) (c == '*' ? GROWTH : 1)
+uint64_t width;
+uint64_t height;
 
-uint64_t galaxies_solve(char **map, uint64_t (*glxs)[2], uint64_t len_glx) {
-  uint64_t sum = 0;
-
-  for (int i = 0; i < len_glx - 1; i++) {
-    uint64_t start_x = glxs[i][0];
-    uint64_t start_y = glxs[i][1];
-
-    for (int j = i + 1; j < len_glx; j++) {
-      uint64_t target_x = glxs[j][0];
-      uint64_t target_y = glxs[j][1];
-
-      while (start_x != target_x || start_y != target_y) {
-        char look_u;
-        char look_d;
-
-        if (target_x > start_x) {
-          char look_l = map[target_y][target_x - 1];
-          if (target_y > start_y) {
-            look_u = map[target_y - 1][target_x];
-            if (look_l == '*') {
-              sum += move_cost(look_u);
-              target_y--;
-            } else {
-              sum += move_cost(look_l);
-              target_x--;
-            }
-          } else if (target_y < start_y) {
-            look_d = map[target_y + 1][target_x];
-            if (look_l == '*') {
-              sum += move_cost(look_d);
-              target_y++;
-            } else {
-              sum += move_cost(look_l);
-              target_x--;
-            }
-          } else {
-            sum += move_cost(look_l);
-            target_x--;
-          }
-        } else if (target_x < start_x) {
-          char look_r = map[target_y][target_x + 1];
-          if (target_y > start_y) {
-            look_u = map[target_y - 1][target_x];
-            if (look_r == '*') {
-              sum += move_cost(look_u);
-              target_y--;
-            } else {
-              sum += move_cost(look_r);
-              target_x++;
-            }
-          } else if (target_y < start_y) {
-            look_d = map[target_y + 1][target_x];
-            if (look_r == '*') {
-              sum += move_cost(look_d);
-              target_y++;
-            } else {
-              sum += move_cost(look_r);
-              target_x++;
-            }
-          } else {
-            sum += move_cost(look_r);
-            target_x++;
-          }
-        } else {
-          if (target_y > start_y) {
-            sum += move_cost(map[target_y - 1][target_x]);
-            target_y--;
-          } else if (target_y < start_y) {
-            sum += move_cost(map[target_y + 1][target_x]);
-            target_y++;
-          }
-        }
-      }
-    }
-  }
-
-  return sum;
-}
+#define min(x, y) (x < y ? x : y)
+#define max(x, y) (x > y ? x : y)
 
 int main(void) {
   FILE *file = fopen(INPUT, "r");
@@ -97,74 +22,73 @@ int main(void) {
     return 1;
   }
 
-  char **map = (char **)malloc(sizeof(char *) * BUFFER_SIZE);
-  if (map == NULL) {
-    perror("map alloc 1");
-    return 1;
-  }
-  for (uint64_t i = 0; i < BUFFER_SIZE; i++) {
-    map[i] = (char *)malloc(sizeof(char) * BUFFER_SIZE);
-  }
-  uint64_t len_x = 0;
-  uint64_t len_y = 0;
-
-  char *line = malloc(BUFFER_SIZE);
-  while (fgets(line, BUFFER_SIZE - 1, file)) {
-    len_x = 0;
-
-    int is_line_empty = 1;
-    char *str = line;
-    for (; *str && (char)*str != '\n'; str++) {
-      char byte = *str;
-      is_line_empty &= (byte == '.');
-      map[len_y][len_x] = byte;
-      len_x++;
-    }
-    len_y++;
-
-    // mark line as 1000000 times bigger
-    if (is_line_empty) {
-      for (int x = 0; x < len_x; x++) {
-        map[len_y - 1][x] = '*';
-      }
-    }
-  }
-
-  // mark column as 1000000 times bigger
-  for (int x = len_x - 1; x >= 0; x--) {
-    int is_column_empty = 1;
-    for (int y = 0; y < len_y; y++) {
-      char byte = map[y][x];
-      is_column_empty &= (byte == '.' || byte == '*');
-    }
-
-    if (is_column_empty) {
-      for (int y = 0; y < len_y; y++) {
-        map[y][x] = '*';
-      }
-    }
-  }
-
   uint64_t(*galaxies)[2] =
-      (uint64_t(*)[2])malloc(sizeof(uint64_t[2]) * BUFFER_SIZE);
+      (uint64_t(*)[2])malloc(sizeof(uint64_t[2]) * MAP_SIZE);
   uint64_t len_glx = 0;
 
-  // get galaxies position after expansion
-  for (int y = 0; y < len_y; y++) {
-    for (int x = 0; x < len_x; x++) {
-      char byte = map[y][x];
-      if (byte == '#') {
-        uint64_t glx[2] = {x, y};
-        memcpy(galaxies + len_glx, glx, sizeof(uint64_t) * 2);
-        len_glx++;
-      }
+  char *map = malloc(MAP_SIZE);
+  uint64_t map_sz = fread(map, sizeof(char), MAP_SIZE, file);
+  width = strstr(map, "\n") - map + 1;
+  height = map_sz / width;
+
+  int ept_rows[height];
+  for (int i = 0; i < height; i++) {
+    ept_rows[i] = 1;
+  }
+  int ept_cols[width - 1];
+  for (int i = 0; i < width - 1; i++) {
+    ept_cols[i] = 1;
+  }
+
+  char *str = map;
+  for (; *str; str++) {
+    char byte = *str;
+    uint64_t curr_pos = str - map;
+    uint64_t x = curr_pos % width;
+    uint64_t y = curr_pos / width;
+
+    if (byte == '#') {
+      galaxies[len_glx][0] = x;
+      galaxies[len_glx][1] = y;
+      len_glx++;
+
+      ept_cols[x] = 0;
+      ept_rows[y] = 0;
     }
   }
 
-  uint64_t path_sum = galaxies_solve(map, galaxies, len_glx);
+  uint64_t distance = 0;
 
-  printf("answer: %zu\n", path_sum);
+  for (int i = 0; i < len_glx - 1; i++) {
+    uint64_t *start = galaxies[i];
+    for (int j = i + 1; j < len_glx; j++) {
+      uint64_t *target = galaxies[j];
+
+      uint64_t min_x = min(start[0], target[0]);
+      uint64_t max_x = max(start[0], target[0]);
+
+      uint64_t min_y = min(start[1], target[1]);
+      uint64_t max_y = max(start[1], target[1]);
+
+      uint64_t n_cols = 0;
+      for (int k = min_x; k < max_x; k++) {
+        n_cols += (ept_cols[k] == 1);
+      }
+
+      uint64_t n_rows = 0;
+      for (int k = min_y; k < max_y; k++) {
+        n_cols += (ept_rows[k] == 1);
+      }
+
+      uint64_t dx = (max_x - min_x);
+      uint64_t dy = (max_y - min_y);
+      distance += dx + dy + (n_cols * (GROWTH - 1)) + (n_rows * (GROWTH - 1));
+    }
+  }
+
+  printf("answer: %lu\n", distance);
 
   fclose(file);
+
   return 0;
 }
