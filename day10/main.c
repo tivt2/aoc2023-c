@@ -1,204 +1,195 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define INPUT "day10/input"
 #define TEST_INPUT "day10/test_input"
 
-#define BUFFER_SIZE 1024
+#define MAZE_SIZE 256 * 256
 
-typedef enum {
-  ANIMAL,
-  TOP_DOWN,
-  LEFT_RIGHT,
-  TOP_RIGHT,
-  TOP_LEFT,
-  DOWN_RIGHT,
-  DOWN_LEFT,
-  NONE,
-  INVALID,
-} Symbol;
+size_t maze_sz;
+size_t w;
 
-Symbol symbol_get(char byte) {
-  switch (byte) {
-  case 'S':
-    return ANIMAL;
-    break;
+#define IDX(x, y) (y * w + x)
+
+typedef enum { LEFT, RIGHT, UP, DOWN } Dir;
+
+void maze_solve_rec(char *maze, size_t x, size_t y, Dir dir, size_t *idx_cache,
+                    size_t *cache_len) {
+  size_t pos = IDX(x, y);
+  if (idx_cache[0] == pos) {
+    return;
+  }
+
+  idx_cache[(*cache_len)++] = pos;
+
+  switch (maze[pos]) {
   case '|':
-    return TOP_DOWN;
+    if (dir == UP) {
+      maze_solve_rec(maze, x, y - 1, UP, idx_cache, cache_len);
+    } else if (dir == DOWN) {
+      maze_solve_rec(maze, x, y + 1, DOWN, idx_cache, cache_len);
+    }
     break;
   case '-':
-    return LEFT_RIGHT;
+    if (dir == LEFT) {
+      maze_solve_rec(maze, x - 1, y, LEFT, idx_cache, cache_len);
+    } else if (dir == RIGHT) {
+      maze_solve_rec(maze, x + 1, y, RIGHT, idx_cache, cache_len);
+    }
     break;
   case 'L':
-    return TOP_RIGHT;
+    if (dir == DOWN) {
+      maze_solve_rec(maze, x + 1, y, RIGHT, idx_cache, cache_len);
+    } else if (dir == LEFT) {
+      maze_solve_rec(maze, x, y - 1, UP, idx_cache, cache_len);
+    }
     break;
   case 'J':
-    return TOP_LEFT;
-    break;
-  case 'F':
-    return DOWN_RIGHT;
+    if (dir == DOWN) {
+      maze_solve_rec(maze, x - 1, y, LEFT, idx_cache, cache_len);
+    } else if (dir == RIGHT) {
+      maze_solve_rec(maze, x, y - 1, UP, idx_cache, cache_len);
+    }
     break;
   case '7':
-    return DOWN_LEFT;
-    break;
-  case '.':
-    return NONE;
-    break;
-  default:
-    return INVALID;
-  }
-}
-
-typedef enum { TOP, RIGHT, DOWN, LEFT } Dir;
-
-static size_t len_x = 0;
-static size_t len_y = 0;
-static size_t animal_idx = 0;
-
-int idx(size_t x, size_t y, size_t *n) {
-  if (x < 0 || x >= len_x || y < 0 || y >= len_y) {
-    return -1;
-  }
-  *n = y * len_y + x;
-  return 1;
-}
-
-int idx_get(size_t n, size_t *x, size_t *y) {
-  if (n < 0 || n >= len_x * len_y) {
-    return -1;
-  }
-  *x = n % len_y;
-  *y = n / len_y;
-  return 1;
-}
-
-int maze_is_valid_pipe(Symbol *maze, size_t pos, Dir dir, Dir *next_dir) {
-  Symbol pipe = maze[pos];
-  switch (dir) {
-  case TOP:
-    if (pipe == TOP_LEFT) {
-      *next_dir = LEFT;
-      return 1;
-    } else if (pipe == TOP_RIGHT) {
-      *next_dir = RIGHT;
-      return 1;
-    } else if (pipe == TOP_DOWN) {
-      *next_dir = DOWN;
-      return 1;
+    if (dir == UP) {
+      maze_solve_rec(maze, x - 1, y, LEFT, idx_cache, cache_len);
+    } else if (dir == RIGHT) {
+      maze_solve_rec(maze, x, y + 1, DOWN, idx_cache, cache_len);
     }
     break;
-  case RIGHT:
-    if (pipe == LEFT_RIGHT) {
-      *next_dir = LEFT;
-      return 1;
-    } else if (pipe == TOP_RIGHT) {
-      *next_dir = TOP;
-      return 1;
-    } else if (pipe == DOWN_RIGHT) {
-      *next_dir = DOWN;
-      return 1;
+  case 'F':
+    if (dir == UP) {
+      maze_solve_rec(maze, x + 1, y, RIGHT, idx_cache, cache_len);
+    } else if (dir == LEFT) {
+      maze_solve_rec(maze, x, y + 1, DOWN, idx_cache, cache_len);
     }
-    break;
-  case DOWN:
-    if (pipe == DOWN_LEFT) {
-      *next_dir = LEFT;
-      return 1;
-    } else if (pipe == TOP_DOWN) {
-      *next_dir = TOP;
-      return 1;
-    } else if (pipe == DOWN_RIGHT) {
-      *next_dir = RIGHT;
-      return 1;
-    }
-    break;
-  case LEFT:
-    if (pipe == DOWN_LEFT) {
-      *next_dir = DOWN;
-      return 1;
-    } else if (pipe == TOP_LEFT) {
-      *next_dir = TOP;
-      return 1;
-    } else if (pipe == LEFT_RIGHT) {
-      *next_dir = RIGHT;
-      return 1;
-    }
-    break;
-  }
-  return 0;
-}
-
-size_t maze_walk(Symbol *maze, size_t pos, Dir dir) {
-  Symbol curr = maze[pos];
-  Dir next_dir;
-  if (curr == ANIMAL) {
-    return 1;
-  } else if (!maze_is_valid_pipe(maze, pos, dir, &next_dir)) {
-    return -1;
-  }
-
-  size_t x, y, next_pos;
-  idx_get(pos, &x, &y);
-
-  switch (next_dir) {
-  case TOP:
-    if (idx(x, y - 1, &next_pos) == 1) {
-      return 1 + maze_walk(maze, next_pos, DOWN);
-    }
-    return -1;
-    break;
-  case RIGHT:
-    if (idx(x + 1, y, &next_pos) == 1) {
-      return 1 + maze_walk(maze, next_pos, LEFT);
-    }
-    return -1;
-    break;
-  case DOWN:
-    if (idx(x, y + 1, &next_pos) == 1) {
-      return 1 + maze_walk(maze, next_pos, TOP);
-    }
-    return -1;
-    break;
-  case LEFT:
-    if (idx(x - 1, y, &next_pos) == 1) {
-      return 1 + maze_walk(maze, next_pos, RIGHT);
-    }
-    return -1;
     break;
   default:
-    return -1;
+    printf("bad maze: %zu, %zu:%zu\n", pos, x, y);
+    printf("%s\n", maze);
   }
 }
 
-size_t maze_solve(Symbol *maze, size_t animal) {
-  size_t len = 0;
+void maze_loop_solve(char *maze, size_t x, size_t y, size_t *idx_cache,
+                     size_t *cache_len) {
+  idx_cache[(*cache_len)++] = IDX(x, y);
 
-  size_t x, y, next_pos;
-  idx_get(animal, &x, &y);
-  if (idx(x, y - 1, &next_pos) == 1) {
-    len = maze_walk(maze, next_pos, DOWN);
-    if (len != -1) {
-      return len;
+  size_t pos_l = IDX((x - 1), y);
+  size_t pos_u = IDX(x, (y - 1));
+  size_t pos_d = IDX(x, (y + 1));
+
+  if (pos_l >= 0 &&
+      (maze[pos_l] == '-' || maze[pos_l] == 'F' || maze[pos_l] == 'L')) {
+    maze_solve_rec(maze, x - 1, y, LEFT, idx_cache, cache_len);
+  } else if (pos_u >= 0 &&
+             (maze[pos_u] == '|' || maze[pos_u] == '7' || maze[pos_u] == 'F')) {
+    maze_solve_rec(maze, x, y - 1, UP, idx_cache, cache_len);
+  } else if (pos_d < maze_sz &&
+             (maze[pos_d] == '|' || maze[pos_d] == 'J' || maze[pos_d] == 'L')) {
+    maze_solve_rec(maze, x, y + 1, DOWN, idx_cache, cache_len);
+  } else {
+    maze_solve_rec(maze, x + 1, y, RIGHT, idx_cache, cache_len);
+  }
+}
+
+int maze_is_inside_loop(char *maze, size_t idx, size_t *pipe_idxs,
+                        size_t pipe_len) {
+  size_t x = idx % w;
+  size_t y = idx / w;
+
+  for (size_t i = 0; i < pipe_len; i++) {
+    size_t pipe = pipe_idxs[i];
+    if (idx == pipe) {
+      return 0;
     }
   }
-  if (idx(x + 1, y, &next_pos) == 1) {
-    len = maze_walk(maze, next_pos, LEFT);
-    if (len != -1) {
-      return len;
+
+  size_t left_count = 0;
+  int walk_x = x;
+
+  while (walk_x >= 0) {
+    size_t pos = IDX(walk_x, y);
+
+    char cur_pipe = '*';
+    for (size_t i = 0; i < pipe_len; i++) {
+
+      if (pos == pipe_idxs[i]) {
+        left_count++;
+        cur_pipe = maze[pos];
+
+        if (cur_pipe == '7') {
+          while ((cur_pipe != 'F' && cur_pipe != 'L') && walk_x >= 0) {
+            walk_x--;
+            cur_pipe = maze[IDX(walk_x, y)];
+          }
+          if (cur_pipe == 'F') {
+            left_count--;
+          }
+        } else if (cur_pipe == 'J') {
+          while ((cur_pipe != 'F' && cur_pipe != 'L') && walk_x >= 0) {
+            walk_x--;
+            cur_pipe = maze[IDX(walk_x, y)];
+          }
+          if (cur_pipe == 'L') {
+            left_count--;
+          }
+        }
+
+        break;
+      }
+    }
+    walk_x--;
+  }
+
+  return left_count % 2 == 1;
+}
+
+void maze_pipe_animal_infer(char *maze, size_t *pipe_idxs, size_t pipe_len) {
+  size_t animal = pipe_idxs[0];
+  size_t first = pipe_idxs[1];
+  size_t last = pipe_idxs[pipe_len - 1];
+
+  int first_walk = first - animal;
+  int last_walk = animal - last;
+  if (first_walk == w) {
+    // down
+    if (last_walk == 12) {
+      maze[animal] = '|';
+    } else if (last_walk == -1) {
+      maze[animal] = 'F';
+    } else {
+      maze[animal] = '7';
+    }
+  } else if (first_walk == -w) {
+    // up
+    if (last_walk == -12) {
+      maze[animal] = '|';
+    } else if (last_walk == -1) {
+      maze[animal] = 'L';
+    } else {
+      maze[animal] = 'J';
+    }
+  } else if (first_walk == 1) {
+    // right
+    if (last_walk == 1) {
+      maze[animal] = '-';
+    } else if (last_walk == 12) {
+      maze[animal] = 'L';
+    } else {
+      maze[animal] = 'F';
+    }
+  } else if (first_walk == -1) {
+    // left
+    if (last_walk == -1) {
+      maze[animal] = '-';
+    } else if (last_walk == 12) {
+      maze[animal] = 'J';
+    } else {
+      maze[animal] = '7';
     }
   }
-  if (idx(x, y + 1, &next_pos) == 1) {
-    len = maze_walk(maze, next_pos, TOP);
-    if (len != -1) {
-      return len;
-    }
-  }
-  if (idx(x - 1, y, &next_pos) == 1) {
-    len = maze_walk(maze, next_pos, RIGHT);
-    if (len != -1) {
-      return len;
-    }
-  }
-  return 0;
 }
 
 int main(void) {
@@ -208,43 +199,32 @@ int main(void) {
     return 1;
   }
 
-  Symbol *maze = (Symbol *)malloc(sizeof(Symbol) * BUFFER_SIZE * BUFFER_SIZE);
-  size_t animal_x = 0;
-  size_t animal_y = 0;
+  char *maze = malloc(MAZE_SIZE);
 
-  char *line = (char *)malloc(BUFFER_SIZE);
-  while (fgets(line, BUFFER_SIZE - 1, file)) {
-    size_t x = 0;
-    char *entry = line;
-    for (; *entry; entry++) {
-      char byte = *entry;
-      Symbol symbol = symbol_get(byte);
-      if (symbol == INVALID) {
-        continue;
-      }
+  maze_sz = fread(maze, sizeof(char), MAZE_SIZE, file);
+  size_t pipe_idxs[maze_sz];
+  size_t pipe_len = 0;
 
-      if (symbol == ANIMAL) {
-        animal_x = x;
-        animal_y = len_y;
-      }
+  w = strstr(maze, "\n") - maze + 1;
+  size_t animal = strstr(maze, "S") - maze;
+  size_t animal_x = animal % w;
+  size_t animal_y = animal / w;
 
-      maze[len_y * len_x + x] = symbol;
+  maze_loop_solve(maze, animal_x, animal_y, pipe_idxs, &pipe_len);
 
-      x++;
+  maze_pipe_animal_infer(maze, pipe_idxs, pipe_len);
+
+  size_t enclosed = 0;
+  for (size_t i = 0; i < maze_sz; i++) {
+    if (maze[i] == '\n') {
+      continue;
     }
 
-    len_x = x;
-    len_y++;
+    enclosed += maze_is_inside_loop(maze, i, pipe_idxs, pipe_len);
   }
 
-  animal_idx = animal_y * len_x + animal_x;
+  printf("answer: %zu\n", enclosed);
 
-  size_t len = maze_solve(maze, animal_idx) / 2;
-
-  printf("answer: %zu\n", len);
-
-  free(maze);
-  free(line);
   fclose(file);
   return 0;
 }
