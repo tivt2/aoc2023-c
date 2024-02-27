@@ -2,9 +2,19 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef struct {
+  char *ipt;
+  int *backup;
+  size_t len;
+} Key;
+
+typedef struct {
+  size_t out;
+} Val;
+
 typedef struct HSNode {
-  char *key;
-  char *val[2];
+  Key *key;
+  Val *val;
   struct HSNode *next;
 } HSNode;
 
@@ -30,8 +40,7 @@ void hashmap_destroy(HashMap *hs) {
     while (curr) {
       HSNode *next = curr->next;
       free(curr->key);
-      free(curr->val[0]);
-      free(curr->val[1]);
+      free(curr->val);
       free(curr);
       curr = next;
     }
@@ -40,21 +49,21 @@ void hashmap_destroy(HashMap *hs) {
   free(hs);
 }
 
-size_t hashmap_hashidx(HashMap *hs, char *key) {
+size_t hashmap_hashidx(HashMap *hs, Key *key) {
   size_t key_sum = 0;
-  for (; *key; key++) {
-    key_sum += *key;
+  for (int i = 0; key->ipt[i]; i++) {
+    key_sum += key->ipt[i] + key->backup[i % key->len] * i;
   }
   return key_sum % hs->size;
 }
 
-char **hashmap_get(HashMap *hs, char *key) {
+HSNode *hashmap_get(HashMap *hs, Key *key) {
   size_t idx = hashmap_hashidx(hs, key);
 
   HSNode *curr = hs->data[idx][0];
   while (curr) {
-    if (strcmp(curr->key, key) == 0) {
-      return curr->val;
+    if (strcmp(curr->key->ipt, key->ipt) == 0) {
+      return curr;
     }
     curr = curr->next;
   }
@@ -62,7 +71,7 @@ char **hashmap_get(HashMap *hs, char *key) {
   return NULL;
 }
 
-void hashmap_add(HashMap *hs, char *key, char *val[2]) {
+void hashmap_add(HashMap *hs, Key *key, Val *val) {
   size_t idx = hashmap_hashidx(hs, key);
 
   HSNode *node = (HSNode *)malloc(sizeof(HSNode));
@@ -70,9 +79,8 @@ void hashmap_add(HashMap *hs, char *key, char *val[2]) {
     perror("hashmaap_add");
     exit(1);
   }
-  node->key = strdup(key);
-  node->val[0] = strdup(val[0]);
-  node->val[1] = strdup(val[1]);
+  node->key = key;
+  node->val = val;
   node->next = NULL;
 
   HSNode **bucket = hs->data[idx];
@@ -81,15 +89,8 @@ void hashmap_add(HashMap *hs, char *key, char *val[2]) {
   } else {
     HSNode *curr = bucket[0];
     while (curr) {
-      if (strcmp(curr->key, key) == 0) {
-        free(curr->val[0]);
-        free(curr->val[1]);
-        curr->val[0] = strdup(val[0]);
-        curr->val[1] = strdup(val[1]);
-        free(node->key);
-        free(node->val[0]);
-        free(node->val[1]);
-        free(node);
+      if (strcmp(curr->key->ipt, key->ipt) == 0) {
+        curr->val = val;
         return;
       }
       curr = curr->next;
@@ -105,7 +106,7 @@ void hashmap_print(HashMap *hs) {
     HSNode *curr = hs->data[i][0];
     int printed = 0;
     while (curr) {
-      printf("[k:%s,v:{%s, %s}] -> ", curr->key, curr->val[0], curr->val[1]);
+      printf("[k: %s,v: %zu] -> ", curr->key->ipt, curr->val->out);
       printed = 1;
       curr = curr->next;
     }
